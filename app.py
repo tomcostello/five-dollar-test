@@ -1,11 +1,17 @@
 # Import from standard library
 import logging
 
+import argparse
 
 # Import from 3rd party libraries
 import streamlit as st
 import streamlit.components.v1 as components
 
+parser = argparse.ArgumentParser(description='The only argument is --merged_model, whoch should point at the merged model.  Add -- before it as streamlit is like that.')
+
+parser.add_argument('--merged_model', action='store', default="merged-model",
+                    help="The name of the merged model")
+args = parser.parse_args()
 # Configure logger
 logging.basicConfig(format="\n%(asctime)s\n%(message)s", level=logging.INFO, force=True)
 
@@ -21,9 +27,6 @@ if "text_error" not in st.session_state:
 if "n_requests" not in st.session_state:
     st.session_state.n_requests = 0
 
-if "n_requests" not in st.session_state:
-    st.session_state.n_requests = 0
-
 if "temperature" not in st.session_state:
     st.session_state.temperature = 1.5
 
@@ -35,7 +38,7 @@ if "top_p" not in st.session_state:
 
     
 if "num_beams" not in st.session_state:
-    st.session_state.num_beams= 20
+    st.session_state.num_beams= 2
 
     
 import torch
@@ -48,14 +51,15 @@ def  get_tokenizer():
     
 @st.cache_resource
 def get_model():
-    return AutoModelForSeq2SeqLM.from_pretrained("/home/ubuntu/save1",torch_dtype=torch.bfloat16, device_map="auto")     
+    model_name = args.merged_model
+    return AutoModelForSeq2SeqLM.from_pretrained(model_name,torch_dtype=torch.bfloat16, device_map="auto")     
 
 tokenizer = get_tokenizer()
 
 model = get_model()
 
 @st.cache_data
-def f(sample, temperature, top_k, top_p, num_beams):
+def get_response(sample, temperature, top_k, top_p, num_beams):
     input_ids = tokenizer(sample, return_tensors="pt", truncation=True).input_ids.cuda()
     outputs = model.generate(input_ids=input_ids, 
                              max_new_tokens=500, 
@@ -125,7 +129,7 @@ def chatbot(text, help):
     with st.spinner("Please wait ..."):
         
         
-        chat_text = f(text,
+        chat_text = get_response(text,
                       st.session_state.temperature,
                       st.session_state.top_k,
                       st.session_state.top_p,
@@ -156,7 +160,7 @@ st.button(
     )
 
 st.markdown(st.session_state.chat)
-st.session_state.temperature = st.number_input('Set temperature. Currently: ' + st.session_state.temperature  )
-st.session_state.top_k = st.number_input('Set top_k. Currently: ' + st.session_state.top_k )
-st.session_state.top_p = st.number_input('Set top_p.  Currently: ' + st.session_state.top_p)
-st.session_state.top_p = st.number_input('Set num_beams.  Currently: ' + st.session_state.num_beams)
+st.session_state.temperature = st.number_input('Set temperature. Currently: ' + str(st.session_state.temperature  ), value=1.5)
+st.session_state.top_k = st.number_input('Set top_k. Currently: ' + str(st.session_state.top_k ), value=50)
+st.session_state.top_p = st.number_input('Set top_p.  Currently: ' + str(st.session_state.top_p), value=0.9)
+st.session_state.top_p = st.number_input('Set num_beams.  Currently: ' + str(st.session_state.num_beams), value=2)
