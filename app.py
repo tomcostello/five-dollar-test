@@ -24,22 +24,17 @@ if "chat" not in st.session_state:
     st.session_state.chat = ""
 if "text_error" not in st.session_state:
     st.session_state.text_error = ""
+
 if "n_requests" not in st.session_state:
     st.session_state.n_requests = 0
 
-if "temperature" not in st.session_state:
-    st.session_state.temperature = 1.5
-
 if "top_k" not in st.session_state:
-    st.session_state.top_k = 50
+    st.session_state.top_k = 8
 
-if "top_p" not in st.session_state:
-    st.session_state.top_p = 0.9
+if "alpha" not in st.session_state:
+    st.session_state.alpha = 0.6
 
     
-if "num_beams" not in st.session_state:
-    st.session_state.num_beams= 2
-
     
 import torch
 from peft import PeftModel, PeftConfig
@@ -59,19 +54,14 @@ tokenizer = get_tokenizer()
 model = get_model()
 
 @st.cache_data
-def get_response(sample, temperature, top_k, top_p, num_beams):
+def get_response(sample, top_k, alpha):
     input_ids = tokenizer(sample, return_tensors="pt", truncation=True).input_ids.cuda()
     outputs = model.generate(input_ids=input_ids, 
-                             max_new_tokens=500, 
-                             do_sample=True, 
-                             top_p=top_p,
-                             num_beams=num_beams,
-                             repetition_penalty=2.5,
-                             early_stopping=True,
-                             no_repeat_ngram_size=2,
-                             use_cache=True,
-                             temperature=temperature,
-                             top_k = top_k)
+                            max_length=500,
+                            penalty_alpha=alpha,
+                            top_k = top_k,
+                            repetition_penalty=2.5,
+                            no_repeat_ngram_size=2)
     print(f"input sentence: {sample}\n{'---'* 10}")
     return f"Answer:\n{tokenizer.batch_decode(outputs.detach().cpu().numpy(), skip_special_tokens=True)[0]}"
 
@@ -130,10 +120,8 @@ def chatbot(text, help):
         
         
         chat_text = get_response(text,
-                      st.session_state.temperature,
                       st.session_state.top_k,
-                      st.session_state.top_p,
-                      st.session_state.num_beams )
+                      st.session_state.alpha )
         
         st.session_state.text_error = ""
         st.session_state.n_requests += 1
@@ -147,7 +135,7 @@ def chatbot(text, help):
         )
 
 # text
-text = st.text_area(label="Enter text", placeholder="Example: does the whitehouse have a pool")
+text = st.text_area(label="Enter text", placeholder="Example: how do you do a blowout")
 
 # chat button
 st.button(
@@ -160,7 +148,5 @@ st.button(
     )
 
 st.markdown(st.session_state.chat)
-st.session_state.temperature = st.number_input('Set temperature. Currently: ' + str(st.session_state.temperature  ), value=1.5)
-st.session_state.top_k = st.number_input('Set top_k. Currently: ' + str(st.session_state.top_k ), value=50)
-st.session_state.top_p = st.number_input('Set top_p.  Currently: ' + str(st.session_state.top_p), value=0.9)
-st.session_state.num_beams = st.number_input('Set num_beams.  Currently: ' + str(st.session_state.num_beams), value=2)
+st.session_state.top_k = st.number_input('Set top_k. Currently: ' + str(st.session_state.top_k ), value=8)
+st.session_state.alpha = st.number_input('Set alpha_penalty.  Currently: ' + str(st.session_state.alpha), value=0.6)
